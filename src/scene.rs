@@ -1,33 +1,20 @@
 // scene.rs - Isla flotante con casa, jardín, árbol y lago
-use crate::block::{self, Block};
+use crate::block::Block;
 use crate::block_types::BlockType;
 use crate::textures::TextureManager;
-use raylib::prelude::*;
+use raylib::prelude::Vector3;
 
-/// Carga las texturas que vamos a usar en los bloques estilo Minecraft
-pub fn load_minecraft_textures(
-    rl: &mut RaylibHandle,
-    thread: &RaylibThread,
-    tex_mgr: &mut TextureManager,
-) -> Result<(), String> {
-    let textures = vec![
-        "textures/grass_top.jpg",
-        "textures/dirt.jpg",
-        "textures/stone.jpg",
-        "textures/cobble.png",
-        "textures/cherry_log.png",
-        "textures/cherry_leaves.png",
-        "textures/leaves_oak.jpg",
-        "textures/glass.png",
-        "textures/sand.png",
-        "textures/magma.png",
-    ];
-
-    for path in textures {
-        tex_mgr.load_texture(rl, thread, path)?;
+/// Carga las texturas de los bloques y les asigna su índice.
+/// Si una imagen falta, el bloque se dibuja con su color difuso.
+pub fn load_textures(textures: &mut TextureManager, blocks: &mut [Block]) {
+    for block in blocks {
+        if let Some(path) = block.material.texture {
+            match textures.load(path) {
+                Ok(id) => block.material.texture_id = Some(id),
+                Err(e) => eprintln!("{e}"),
+            }
+        }
     }
-
-    Ok(())
 }
 
 /// Crea una isla flotante estilo Minecraft con casa, jardín, árbol y lago
@@ -166,7 +153,7 @@ pub fn create_optimized_scene() -> Vec<Block> {
     blocks.push(BlockType::Leaves.to_block(Vector3::new(3.0, 1.0, 0.0), 1.0));
     blocks.push(BlockType::Leaves.to_block(Vector3::new(2.0, 1.0, 0.0), 1.0));
     blocks.push(BlockType::Leaves.to_block(Vector3::new(1.0, 1.0, 0.0), 1.0));
-    
+
     blocks.push(BlockType::Leaves.to_block(Vector3::new(1.0, 1.0, -1.0), 1.0));
     blocks.push(BlockType::Leaves.to_block(Vector3::new(3.0, 1.0, -1.0), 1.0));
 
@@ -193,9 +180,9 @@ pub fn create_optimized_scene() -> Vec<Block> {
         (-3.0, 3.0),
         (0.0, 3.0),
         (3.0, -3.0),
-        (-1.0,3.0),
+        (-1.0, 3.0),
         (-1.0, 2.0),
-        (-1.0,-1.0),
+        (-1.0, -1.0),
     ];
     for (mx, mz) in magma_spots {
         // poner magma sobre la capa de superficie (y = 0)
@@ -207,12 +194,6 @@ pub fn create_optimized_scene() -> Vec<Block> {
 
     // === SOL EMISIVO (fuente de luz visual) ===
     blocks.push(BlockType::Sun.to_block(Vector3::new(8.0, 10.0, -8.0), 2.0));
-
-    println!("Isla flotante creada con {} bloques", blocks.len());
-    println!("- Casa: 3x3 con ventanas y techo");
-    println!("- Árbol: 3 bloques de altura con copa");
-    println!("- Lago: 3x3 con arena alrededor");
-    println!("- Base: isla flotante cónica");
 
     blocks
 }
