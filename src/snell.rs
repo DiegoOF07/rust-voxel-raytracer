@@ -1,7 +1,7 @@
 // snell.rs - Módulo de raytracing optimizado y reorganizado
-use crate::block::Block;
+use crate::grid::World;
 use crate::light::Light;
-use crate::ray_intersect::{Intersect, RayIntersect};
+use crate::ray_intersect::Intersect;
 use crate::textures::TextureManager;
 use raylib::prelude::*;
 
@@ -10,6 +10,8 @@ const MAX_DISTANCE: f32 = 50.0;
 const EPSILON: f32 = 1e-4;
 const MIN_REFLECTION_THRESHOLD: f32 = 0.05;
 const MIN_SPECULAR_THRESHOLD: f32 = 5.0;
+/// Luz ambiente blanca: suaviza el contraste en las caras que ninguna luz toca
+const AMBIENT: f32 = 0.3;
 
 // === FUNCIONES DE FÍSICA ÓPTICA ===
 
@@ -43,35 +45,6 @@ pub fn refract(incident: &Vector3, normal: &Vector3, refractive_index: f32) -> V
     } else {
         *incident * eta + n * (eta * cosi - k.sqrt())
     }
-}
-
-// === FUNCIONES DE INTERSECCIÓN ===
-
-/// Encuentra la intersección más cercana en la escena
-#[inline]
-fn find_closest_intersection<'a>(
-    origin: &Vector3,
-    dir: &Vector3,
-    scene: &'a [Block],
-) -> Option<Intersect<'a>> {
-    let mut closest: Option<Intersect<'a>> = None;
-    let mut min_distance = MAX_DISTANCE;
-
-    for block in scene {
-        let hit = block.ray_intersect(origin, dir);
-        if hit.is_intersecting && hit.distance < min_distance {
-            min_distance = hit.distance;
-
-            // Early termination para objetos muy cercanos
-            if hit.distance < 0.1 {
-                return Some(hit);
-            }
-
-            closest = Some(hit);
-        }
-    }
-
-    closest
 }
 
 // === FUNCIONES DE SHADING ===
@@ -108,7 +81,7 @@ fn calculate_light_contribution<'a>(
         let n_dot_h = intersect.normal.dot(half_vector).max(0.0);
         let spec = n_dot_h.powf(material.specular);
 
-        color = color + light.color * spec * material.albedo[1] * attenuation;
+        color += light.color * spec * material.albedo[1] * attenuation;
     }
 
     color
@@ -126,9 +99,9 @@ fn get_material_color<'a>(intersect: &Intersect<'a>, texture_manager: &TextureMa
     let mut base_color = material.diffuse;
 
     // Aplicar textura si existe
-    if let Some(texture_path) = &material.texture {
-        let texture_color = texture_manager.sample_texture(texture_path, intersect.u, intersect.v);
-        base_color = base_color * texture_color;
+    if let Some(id) = material.texture_id {
+        let texture_color = texture_manager.sample(id, intersect.u, intersect.v);
+        base_color *= texture_color;
     }
 
     base_color
@@ -154,7 +127,7 @@ pub fn trace_ray_multi_light(
     dir: Vector3,
     depth: u32,
     max_depth: u32,
-    scene: &[Block],
+    world: &World,
     lights: &[Light],
     texture_manager: &TextureManager,
 ) -> Vector3 {
@@ -162,7 +135,7 @@ pub fn trace_ray_multi_light(
         return sky_color(&dir);
     }
 
-    let intersect = match find_closest_intersection(&origin, &dir, scene) {
+    let intersect = match world.closest_hit(origin, dir, MAX_DISTANCE) {
         Some(hit) => hit,
         None => return sky_color(&dir),
     };
@@ -177,11 +150,10 @@ pub fn trace_ray_multi_light(
     // === iluminación directa ===
     let mut final_color = Vector3::zero();
     for light in lights {
-        final_color =
-            final_color + calculate_light_contribution(&intersect, light, &base_color, &dir);
+        final_color += calculate_light_contribution(&intersect, light, &base_color, &dir);
     }
     if !lights.is_empty() {
-        final_color = final_color / lights.len() as f32;
+        final_color /= lights.len() as f32;
     }
 
     // === Emisión basada en textura o diffuse ===
@@ -196,7 +168,7 @@ pub fn trace_ray_multi_light(
         };
 
         // Emisión directa
-        final_color = final_color + emission_base * material.emission_strength;
+        final_color += emission_base * material.emission_strength;
 
         // --- Fake glow extra ---
         let glow_strength = material.emission_strength;
@@ -205,11 +177,10 @@ pub fn trace_ray_multi_light(
         let dist = (intersect.point - origin).length();
         let dist_factor = 1.0 / (1.0 + 0.15 * dist);
 
-        final_color =
-            final_color + emission_base * glow_strength * angle_factor * dist_factor * 2.0;
+        final_color += emission_base * glow_strength * angle_factor * dist_factor * 2.0;
     }
 
-    final_color = final_color + base_color * 0.08; // ambiente sutil
+    final_color += base_color * AMBIENT;
 
     // === reflexión y refracción ===
     let mut reflection_color = Vector3::zero();
@@ -225,7 +196,7 @@ pub fn trace_ray_multi_light(
             reflected_dir,
             depth + 1,
             max_depth,
-            scene,
+            world,
             lights,
             texture_manager,
         );
@@ -245,7 +216,7 @@ pub fn trace_ray_multi_light(
                 refracted_dir.normalized(),
                 depth + 1,
                 max_depth,
-                scene,
+                world,
                 lights,
                 texture_manager,
             );
@@ -290,4 +261,60 @@ fn calculate_fresnel(cos_i: f32, refractive_index: f32) -> f32 {
     let n2 = refractive_index;
     let r0 = ((n1 - n2) / (n1 + n2)).powi(2);
     r0 + (1.0 - r0) * (1.0 - cos_i).powi(5) // Schlick
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn close(a: Vector3, b: Vector3) -> bool {
+        (a - b).length() < 1e-5
+    }
+
+    #[test]
+    fn reflection_mirrors_the_ray_around_the_normal() {
+        let incident = Vector3::new(1.0, -1.0, 0.0).normalized();
+        let normal = Vector3::new(0.0, 1.0, 0.0);
+        assert!(close(
+            reflect(&incident, &normal),
+            Vector3::new(1.0, 1.0, 0.0).normalized()
+        ));
+    }
+
+    #[test]
+    fn a_ray_hitting_glass_head_on_goes_straight_through() {
+        let down = Vector3::new(0.0, -1.0, 0.0);
+        let refracted = refract(&down, &Vector3::new(0.0, 1.0, 0.0), 1.5);
+        assert!(close(refracted.normalized(), down), "{refracted:?}");
+    }
+
+    #[test]
+    fn refraction_follows_snells_law() {
+        // Entra del aire (n = 1) al vidrio (n = 1.5) a 45 grados
+        let incident = Vector3::new(1.0, -1.0, 0.0).normalized();
+        let refracted = refract(&incident, &Vector3::new(0.0, 1.0, 0.0), 1.5).normalized();
+        let sin_in = incident.x.abs();
+        let sin_out = refracted.x.abs();
+        assert!(
+            (sin_in - 1.5 * sin_out).abs() < 1e-4,
+            "sen θ1 = {sin_in}, sen θ2 = {sin_out}"
+        );
+        assert!(refracted.y < 0.0, "debe seguir hacia dentro del vidrio");
+    }
+
+    #[test]
+    fn a_grazing_ray_leaving_glass_is_totally_reflected() {
+        // Sale del vidrio casi rasante: no hay refracción posible
+        let incident = Vector3::new(0.95, 0.312, 0.0).normalized();
+        let outward_normal = Vector3::new(0.0, 1.0, 0.0);
+        assert_eq!(refract(&incident, &outward_normal, 1.5), Vector3::zero());
+    }
+
+    #[test]
+    fn fresnel_grows_toward_grazing_angles() {
+        let head_on = calculate_fresnel(1.0, 1.5);
+        let grazing = calculate_fresnel(0.05, 1.5);
+        assert!((head_on - 0.04).abs() < 1e-3, "{head_on}");
+        assert!(grazing > 0.7 && grazing <= 1.0, "{grazing}");
+    }
 }

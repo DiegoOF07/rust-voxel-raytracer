@@ -1,5 +1,5 @@
 // material.rs
-use raylib::prelude::*;
+use raylib::prelude::Vector3;
 
 /// Define las propiedades físicas y visuales de un material.
 /// Se usa para calcular cómo interactúa la luz con la superficie.
@@ -27,102 +27,14 @@ pub struct Material {
     pub refractive_index: f32,
 
     /// Ruta opcional a la textura difusa.
-    pub texture: Option<String>,
+    pub texture: Option<&'static str>,
 
-    /// Ruta opcional a un normal map.
-    pub normal_map_id: Option<String>,
+    /// Índice de la textura ya cargada; se asigna al cargar la escena.
+    pub texture_id: Option<usize>,
 
     /// Ruta opcional para el color del halo de luz
     pub emission_color: Option<Vector3>,
 
     /// Intensidad de la luz emitida
-    pub emission_strength: f32, 
-}
-
-impl Material {
-    /// Crea un nuevo material con los parámetros especificados.
-    pub fn new(
-        diffuse: Vector3,
-        albedo: [f32; 2],
-        specular: f32,
-        reflectivity: f32,
-        transparency: f32,
-        refractive_index: f32,
-        texture: Option<String>,
-        normal_map_id: Option<String>,
-    ) -> Self {
-        Self {
-            diffuse,
-            albedo,
-            specular,
-            reflectivity,
-            transparency,
-            refractive_index,
-            texture,
-            normal_map_id,
-            emission_color: None,
-            emission_strength: 0.0,
-        }
-    }
-
-    pub fn new_emissive(
-        diffuse: Vector3,
-        albedo: [f32; 2],
-        specular: f32,
-        reflectivity: f32,
-        transparency: f32,
-        refractive_index: f32,
-        texture: Option<String>,
-        normal_map_id: Option<String>,
-        emission_color: Option<Vector3>,
-        emission_strength: f32,
-    ) -> Self {
-        Self {
-            diffuse,
-            albedo,
-            specular,
-            reflectivity,
-            transparency,
-            refractive_index,
-            texture,
-            normal_map_id,
-            emission_color,
-            emission_strength,
-        }
-    }
-
-    /// Material negro por defecto (sin interacción con la luz).
-    pub fn black() -> Self {
-        Self {
-            diffuse: Vector3::zero(),
-            albedo: [0.0, 0.0],
-            specular: 0.0,
-            reflectivity: 0.0,
-            transparency: 0.0,
-            refractive_index: 0.0,
-            texture: None,
-            normal_map_id: None,
-            emission_color: None,
-            emission_strength: 0.0,
-        }
-    }
-}
-
-/// Convierte un `Vector3` (0.0–1.0) en un `Color` de Raylib (0–255).
-pub fn vector3_to_color(v: Vector3) -> Color {
-    Color::new(
-        (v.x * 255.0).clamp(0.0, 255.0) as u8,
-        (v.y * 255.0).clamp(0.0, 255.0) as u8,
-        (v.z * 255.0).clamp(0.0, 255.0) as u8,
-        255,
-    )
-}
-
-/// Convierte un `Color` de Raylib (0–255) en un `Vector3` normalizado (0.0–1.0).
-pub fn color_to_vector3(color: Color) -> Vector3 {
-    Vector3::new(
-        color.r as f32 / 255.0,
-        color.g as f32 / 255.0,
-        color.b as f32 / 255.0,
-    )
+    pub emission_strength: f32,
 }

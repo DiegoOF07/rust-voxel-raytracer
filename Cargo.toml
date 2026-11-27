@@ -1,5 +1,5 @@
 [package]
-name = "project2-graphics"
+name = "rust-voxel-raytracer"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,3 +9,4 @@ debug = false
 
 [dependencies]
 raylib = "5.5.1"
+rayon = "1.11"

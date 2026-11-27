@@ -16,17 +16,11 @@ pub struct Light {
 impl Light {
     /// Crea una nueva luz con parámetros personalizados.
     pub fn new(position: Vector3, color: Vector3, intensity: f32) -> Self {
-        Self { position, color, intensity }
-    }
-
-    /// Devuelve el color de la luz como `raylib::Color` (clamp de 0-255).
-    pub fn as_color(&self) -> Color {
-        Color::new(
-            (self.color.x.clamp(0.0, 1.0) * 255.0) as u8,
-            (self.color.y.clamp(0.0, 1.0) * 255.0) as u8,
-            (self.color.z.clamp(0.0, 1.0) * 255.0) as u8,
-            255,
-        )
+        Self {
+            position,
+            color,
+            intensity,
+        }
     }
 }
 

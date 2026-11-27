@@ -1,6 +1,6 @@
 // ray_intersect.rs
-use raylib::prelude::Vector3;
 use crate::material::Material;
+use raylib::prelude::Vector3;
 
 /// Resultado de una intersección. Contiene una referencia al material
 /// para evitar clonados de Material por cada rayo.
@@ -28,7 +28,14 @@ pub struct Intersect<'a> {
 
 impl<'a> Intersect<'a> {
     /// Intersección válida con referencia al material
-    pub fn new(material: &'a Material, distance: f32, normal: Vector3, point: Vector3, u: f32, v: f32) -> Self {
+    pub fn new(
+        material: &'a Material,
+        distance: f32,
+        normal: Vector3,
+        point: Vector3,
+        u: f32,
+        v: f32,
+    ) -> Self {
         Intersect {
             material: Some(material),
             distance,

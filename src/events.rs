@@ -1,11 +1,6 @@
 use raylib::prelude::*;
 
-pub fn handle_camera_input(
-    rl: &RaylibHandle,
-    pos: &mut Vector3,
-    yaw: &mut f32,
-    pitch: &mut f32,
-) {
+pub fn handle_camera_input(rl: &RaylibHandle, pos: &mut Vector3, yaw: &mut f32, pitch: &mut f32) {
     let move_speed = 0.1;
     let rot_speed = 0.03;
 
